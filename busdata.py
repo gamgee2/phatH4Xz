@@ -13,11 +13,11 @@ class Stop():
         self.stop_desc = csv_line[3]
         self.stop_lat  = csv_line[4]
         self.stop_lon  = csv_line[5]
-        self.zone_id   = csv_line[6]
+       # self.zone_id   = csv_line[6]
 # stopUrl
-        self.location_type  = csv_line[8]
-        self.parent_station = csv_line[9]
-        self.platform_code  = csv_line[10]
+       # self.location_type  = csv_line[8]
+       # self.parent_station = csv_line[9]
+       # self.platform_code  = csv_line[10]
 
 
 
@@ -25,6 +25,7 @@ class Time():
 
     # day number: integer between 0 to 6 beginning from Monday. 
     def __init__(self, csv_line, day_number):
+        #if "FUL" in csv_line[0]:
         self.importData(csv_line)
 
     def importData(self, csv_line):
@@ -34,8 +35,8 @@ class Time():
         self.departure_time = csv_line[2]
         self.stop_id        = csv_line[3]
         self.stop_sequence  = csv_line[4]
-        self.pickup_type    = csv_line[5]
-        self.drop_off_type  = csv_line[6]
+        #self.pickup_type    = csv_line[5]
+        #self.drop_off_type  = csv_line[6]
 
         self.arrival_time_seconds = self.processTime(csv_line[1])
         self.departure_time_seconds = self.processTime(csv_line[2])

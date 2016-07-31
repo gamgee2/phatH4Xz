@@ -7,6 +7,12 @@ from math import sqrt
 from time import strftime
 from datetime import datetime, time
 
+from google.transit import gtfs_realtime_pb2
+import urllib
+#from datetime import datetime
+#import datetime
+#import time
+
 # Import data storage classes
 from busdata import Stop, Time, Trip, Route
 
@@ -111,8 +117,14 @@ class Schedule():
             times = self.get_times_by_stop(stop, n_times)
             print('Stop: {0}'.format(stop.stop_name))
             print('Current time: {0}'.format(strftime('%H:%M')))
+
+            dist_to_stop = sqrt((float(u_lat)-float(stop.stop_lat))**2 +  (float(u_lon)-float(stop.stop_lon))**2)*111.120
+            print('Distance to stop: {0:.1f} km'.format(dist_to_stop))
+
             line_string_format = '{0} {1} {2}'
             print(line_string_format.format('Route','Destination','Departs'))
+
+
 
             for time in times:
                 trip  = self.get_trip(time)
@@ -124,7 +136,10 @@ class Schedule():
                 # print(line_string_format.format(route.route_short_name, time.trip_id, time.departure_time))
 
     def output(self, u_lat, u_lon, n_stops = 1, n_times = 3):
-        
+
+        #get latest live feed
+        updatedFeed = self.update_info()
+       
         stops = self.nearest(u_lat, u_lon, n_stops)
 
         seconds_since_midnight = self._seconds_since_midnight()
@@ -133,21 +148,61 @@ class Schedule():
         for stop in stops:
             times = self.get_times_by_stop(stop, n_times)
             lines = []
+
+            dist_to_stop = sqrt((float(u_lat)-float(stop.stop_lat))**2 +  (float(u_lon)-float(stop.stop_lon))**2)*111.120
+
+
             for time in times:
                 trip  = self.get_trip(time)
                 route = self.get_route(trip)
-                mins_to_dep = int((time.departure_time_seconds - seconds_since_midnight)//60)
+
+                #Update the time entry from live feed
+                latest_time = self.update_time(updatedFeed, time)
+
+                mins_to_dep = int((latest_time.departure_time_seconds - seconds_since_midnight)//60)
                 min_suffix = ' min' if abs(mins_to_dep) == 1 else ' mins'
 
                 lines.append(
                     (route.route_short_name, route.route_long_name, str(mins_to_dep)+min_suffix)
                     )
             stoplist.append({
-                'stop':stop.stop_name,
-                'lines':lines,
-                'dist':'0m',
+                'stop':  stop.stop_name,
+                'lines': lines,
+                'dist':  '{0:.1f} km'.format(dist_to_stop),
                 })
         return stoplist
+
+    def update_time(self, updatedFeed, time):
+        for updatedLine in updatedFeed:
+                if updatedLine[1] == time.stop_sequence:
+                    time.arrival_time_seconds = updatedLine[2]
+                    time.departure_time_seconds = updatedLine[3]
+                    
+
+    def seconds_at_midnight(self):
+        today = datetime.date.today()
+        unix_time= today.strftime("%s") #Second as a decimal number [00,61] (or Unix Timestamp)
+        return int(unix_time)
+    
+    def update_info(self):
+        secondsAtMidnight = seconds_at_midnight()
+        feed = gtfs_realtime_pb2.FeedMessage()
+        response = urllib.urlopen('https://gtfsrt.api.translink.com.au/Feed/SEQ')
+        feed.ParseFromString(response.read())
+        arrayRow = 0
+        outputArray = []
+        for entity in feed.entity:
+            if entity.HasField('trip_update'):# and entity.trip_update.HasField('stop_time_update')
+                stopTimeUpdate = entity.trip_update.stop_time_update
+
+            if len(stopTimeUpdate) > 0:
+                for i in stopTimeUpdate:
+                   # print "stop_id", i.stop_id
+                   # print "stop_sequence", i.stop_sequence
+                   # print "arrival time", i.arrival.time - secondsAtMidnight
+                   # print "departure time", i.departure.time - secondsAtMidnight
+                    outputArray.append([i.stop_id, i.stop_sequence, i.arrival.time - secondsAtMidnight, i.departure.time - secondsAtMidnight])
+        return outputArray
 
 
 def save(schedule, filename):
